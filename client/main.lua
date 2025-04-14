@@ -2,8 +2,9 @@ local QBCore = exports['qb-core']:GetCoreObject()
 local carryPackage = nil
 local packageCoords = nil
 local onDuty = false
-local createdInteriorObjects = {} -- 内部オブジェクト追跡用テーブル追加
-local canInteractWithDoor = true -- ドア操作クールダウンフラグ追加
+-- オブジェクトが重なる問題用
+local createdInteriorObjects = {} -- 内部オブジェクト追跡用テーブル
+local canInteractWithDoor = true -- ドア操作クールダウンフラグ
 local doorInteractionCooldown = 1000 -- ドア操作クールダウン時間(ms)
 
 -- zone check
@@ -348,7 +349,7 @@ local function buildInteriorDesign()
         PlaceObjectOnGroundProperly(obj)
         FreezeEntityPosition(obj, true)
         table.insert(createdInteriorObjects, obj) -- テーブルに追加
-        print(string.format('[DEBUG Interior] Created and recorded object: %d', obj)) -- DEBUGログ追加
+        -- print(string.format('[DEBUG Interior] Created and recorded object: %d', obj))
     end
 end
 
@@ -373,21 +374,20 @@ end
 
 local function ExitLocation()
     -- ここから
-    print(string.format('[DEBUG Interior] Entering ExitLocation. Current object count: %d', #createdInteriorObjects)) -- DEBUGログ追加
-    -- 追加：内部オブジェクトを削除
-    for i, objHandle in ipairs(createdInteriorObjects) do -- ipairsを使用推奨
-        print(string.format('[DEBUG Interior] Attempting to delete object %d: Handle=%d', i, objHandle)) -- DEBUGログ追加
+    -- print(string.format('[DEBUG Interior] Entering ExitLocation. Current object count: %d', #createdInteriorObjects))
+    -- 内部オブジェクトを削除
+    for i, objHandle in ipairs(createdInteriorObjects) do
+        -- print(string.format('[DEBUG Interior] Attempting to delete object %d: Handle=%d', i, objHandle))
         if DoesEntityExist(objHandle) then
-            print(string.format('[DEBUG Interior] Entity %d exists. Deleting...', objHandle)) -- DEBUGログ追加
+            -- print(string.format('[DEBUG Interior] Entity %d exists. Deleting...', objHandle))
             DeleteEntity(objHandle)
-            -- DeleteEntityは非同期の可能性もあるため、削除直後の確認は確実ではない
             -- print(string.format('[DEBUG Interior] DeleteEntity called for %d.', objHandle))
         else
-            print(string.format('[DEBUG Interior] Entity %d does NOT exist or already deleted.', objHandle)) -- DEBUGログ追加
+            -- print(string.format('[DEBUG Interior] Entity %d does NOT exist or already deleted.', objHandle))
         end
     end
     createdInteriorObjects = {} -- テーブルをクリア
-    print('[DEBUG Interior] Object table cleared. New count: %d', #createdInteriorObjects) -- DEBUGログ追加 (クリア後のカウント確認)
+    -- print('[DEBUG Interior] Object table cleared. New count: %d', #createdInteriorObjects)
     -- ここまで
 
     DoScreenFadeOut(500)
@@ -574,13 +574,12 @@ CreateThread(function()
             if isInsideEntranceZone then
                 sleep = 0
                 if IsControlJustReleased(0, 38) and canInteractWithDoor then -- クールダウンチェック追加
-                    canInteractWithDoor = false -- すぐにフラグをfalseに
+                    canInteractWithDoor = false
                     exports['qb-core']:KeyPressed()
-                    -- Wait(500) -- ここでのWaitは削除
-                    TriggerEvent('qb-recyclejob:client:target:enterLocation') -- イベント発行
+                    -- Wait(500)
+                    TriggerEvent('qb-recyclejob:client:target:enterLocation')
                     exports['qb-core']:HideText()
 
-                    -- クールダウンスレッドを開始
                     CreateThread(function()
                         Wait(doorInteractionCooldown)
                         canInteractWithDoor = true
@@ -591,13 +590,12 @@ CreateThread(function()
             if isInsideExitZone then
                 sleep = 0
                 if IsControlJustReleased(0, 38) and canInteractWithDoor then -- クールダウンチェック追加
-                    canInteractWithDoor = false -- すぐにフラグをfalseに
+                    canInteractWithDoor = false
                     exports['qb-core']:KeyPressed()
                     -- Wait(500)
                     TriggerEvent('qb-recyclejob:client:target:exitLocation')
                     exports['qb-core']:HideText()
 
-                    -- クールダウンスレッドを開始
                     CreateThread(function()
                         Wait(doorInteractionCooldown)
                         canInteractWithDoor = true
