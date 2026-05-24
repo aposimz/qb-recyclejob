@@ -31,8 +31,10 @@ end)
 
 local function DrawPackageLocationBlip()
     if not Config.DrawPackageLocationBlip then return end
-    SetEntityDrawOutline(props[packageCoords], true)
-    SetEntityDrawOutlineColor(props[packageCoords], 15, 20, 60)
+    local ent = props[packageCoords] -- 縁取りの色が反映されていない問題修正
+    SetEntityDrawOutline(ent, true)
+    SetEntityDrawOutlineColor(0, 200, 0, 1.0)
+    SetEntityDrawOutlineShader(1)
 end
 
 local function GetRandomPackage()
@@ -95,6 +97,10 @@ local function ExitLocation()
     DoScreenFadeIn(500)
 
     onDuty = false
+    if packageCoords then -- 退出時にきちんとリセットされるように追加
+        SetEntityDrawOutline(props[packageCoords], false)
+        packageCoords = nil
+    end
 
     if carryPackage then
         DropPackage()
@@ -117,6 +123,8 @@ local function toggleDuty()
 end
 
 local function pickUp()
+    if not onDuty or not packageCoords then return end
+
     isBusy = true
     QBCore.Functions.Progressbar('pickup_reycle_package', Lang:t('text.picking_up_the_package'), Config.PickupActionDuration, false, true, {
         disableMovement = true,
@@ -158,7 +166,7 @@ local function sellMaterials()
     QBCore.Functions.TriggerCallback('qb-recyclejob:server:getPriceList', function(data)
         local menu = {}
         if data == false then
-            QBCore.Functions.Notify(Lang:t('error.too_far_to_sell') 'error')
+            QBCore.Functions.Notify(Lang:t('error.too_far_to_sell'), 'error')
             return
         end
         for k, v in pairs(data) do
@@ -166,7 +174,7 @@ local function sellMaterials()
                 menu[#menu + 1] = {
                     header = sharedItems[k].label,
                     txt = Lang:t('text.price', { price = v }),
-                    icon = 'nui://qb-inventory/html/images/' .. sharedItems[k].name .. '.png',
+                    icon = ('nui://ox_inventory/web/images/%s.png'):format(k),
                     action = function()
                         local dialog = exports['qb-input']:ShowInput({
                             header = Lang:t('text.sell') .. ' ' .. sharedItems[k].label,
@@ -180,8 +188,10 @@ local function sellMaterials()
                                 },
                             }
                         })
-                        if not dialog and dialog.amount then return end
-                        TriggerServerEvent('qb-recyclejob:server:sellItem', k, tonumber(dialog.amount))
+                        if not dialog then return end
+                        local amount = tonumber(dialog.amount)
+                        if not amount or amount <= 0 then return end
+                        TriggerServerEvent('qb-recyclejob:server:sellItem', k, amount)
                     end
                 }
             end
@@ -253,12 +263,12 @@ local function Start()
                         label = Lang:t('text.get_package'),
                         icon = 'fas fa-box',
                         action = function()
-                            if not isBusy then
+                            if onDuty and packageCoords == k and not isBusy then
                                 pickUp()
                             end
                         end,
                         canInteract = function()
-                            if packageCoords == k then
+                            if onDuty and packageCoords == k then
                                 if isBusy == false then
                                     return true
                                 end
@@ -279,7 +289,7 @@ local function Start()
             })
             zones[k]:onPlayerInOut(function(isPointInside)
                 if isPointInside then
-                    if k == packageCoords then
+                    if onDuty and k == packageCoords then
                         inZone['targetCrate'] = true
                         exports['qb-core']:DrawText(Lang:t('text.point_get_package'), 'left')
                     end
@@ -390,9 +400,10 @@ local function Start()
             maxZ = Config.DutyLocation.z + 1.0,
             debugPoly = false
         })
-        local turnIn = BoxZone:Create(vector3(Config.DropLocation.x, Config.DropLocation.y, Config.DropLocation.z), 2.0, 1.5, {
+        -- パッケージを開けるドアの反応範囲
+        local turnIn = BoxZone:Create(vector3(Config.DropLocation.x, Config.DropLocation.y, Config.DropLocation.z), 2, 4, {
             name = 'recycleDrop',
-            heading = 180.0,
+            heading = Config.DropLocation.w,
             minZ = Config.DropLocation.z - 1.0,
             maxZ = Config.DropLocation.z + 2.0,
             debugPoly = false
@@ -467,7 +478,7 @@ local function Start()
                 until IsControlJustReleased(0, 38) or not inZone['targetCrate']
                 exports['qb-core']:HideText()
                 if inZone['targetCrate'] then
-                    if not isBusy then
+                    if onDuty and not isBusy then
                         pickUp()
                     end
                 end

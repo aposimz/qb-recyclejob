@@ -29,6 +29,7 @@ local Translations = {
         nothing_to_sell = "You Have Nothing To Sell",
         out_of_stock = "%{item} Is Out Of Stock",
         too_far_to_sell = "You Are Too Far Away To Sell",
+        cannot_carry = "You cannot carry any more",
     },
 }
 
